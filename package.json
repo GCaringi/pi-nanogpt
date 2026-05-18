@@ -1,0 +1,25 @@
+{
+  "name": "pi-nanogpt",
+  "version": "1.0.0",
+  "description": "NanoGPT provider extension for Pi coding agent",
+  "pi": {
+    "extensions": [
+      "nanogpt/index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.75.3"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "nanogpt"
+  ],
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "type": "commonjs"
+}
