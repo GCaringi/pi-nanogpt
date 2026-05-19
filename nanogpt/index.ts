@@ -20,34 +20,46 @@ async function fetchModels(apiKey: string) {
   }));
 }
 
-const fallbackModels = [
-  {
-    id: "moonshotai/kimi-k2.6",  // fix: id non può essere vuoto
-    name: "Kimi K2.6",
-    reasoning: false,
-    input: ["text"] as ("text" | "image")[],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 200000,
-    maxTokens: 4096,
-  },
-];
-
-export default async function (pi: ExtensionAPI) {
+function readApiKey(): string {
   let apiKey = process.env.NANOGPT_API_KEY ?? "";
   try {
     const authPath = join(homedir(), ".pi", "agent", "auth.json");
     const auth = JSON.parse(readFileSync(authPath, "utf-8"));
     if (auth?.nanogpt?.key) apiKey = auth.nanogpt.key;
   } catch {}
+  return apiKey;
+}
 
-  let models = fallbackModels;  // fix: sempre inizializzato
-  if (apiKey) {
-    try {
-      models = await fetchModels(apiKey);
-      console.log(`[nanogpt] caricati ${models.length} modelli`);
-    } catch (e) {
-      console.error("[nanogpt] fetch modelli fallito, uso fallback:", e);
-    }
+export default async function (pi: ExtensionAPI) {
+  const apiKey = readApiKey();
+
+  if (!apiKey) {
+    pi.registerProvider("nanogpt", {
+      name: "NanoGPT",
+      baseUrl: "https://nano-gpt.com/api/v1",
+      apiKey: "NANOGPT_API_KEY",
+      authHeader: true,
+      api: "openai-completions",
+      models: [],
+    });
+
+    pi.registerCommand("nanogpt-reload", {
+      description: "Ricarica i modelli NanoGPT dopo il login",
+      handler: async (_args, ctx) => {
+        ctx.ui.notify("Ricarico i modelli NanoGPT...", "info");
+        await ctx.reload();
+      },
+    });
+
+    return;
+  }
+
+  let models: any[] = [];
+  try {
+    models = await fetchModels(apiKey);
+    console.log(`[nanogpt] caricati ${models.length} modelli`);
+  } catch (e) {
+    console.error("[nanogpt] fetch modelli fallito:", e);
   }
 
   pi.registerProvider("nanogpt", {
