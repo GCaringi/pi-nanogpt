@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -25,7 +26,9 @@ function readApiKey(): string {
   try {
     const authPath = join(homedir(), ".pi", "agent", "auth.json");
     const auth = JSON.parse(readFileSync(authPath, "utf-8"));
-    if (auth?.nanogpt?.key) apiKey = auth.nanogpt.key;
+    const entry = auth?.nanogpt;
+    if (entry?.access) apiKey = entry.access; // oauth
+    else if (entry?.key) apiKey = entry.key;  // api_key
   } catch {}
   return apiKey;
 }
@@ -33,33 +36,14 @@ function readApiKey(): string {
 export default async function (pi: ExtensionAPI) {
   const apiKey = readApiKey();
 
-  if (!apiKey) {
-    pi.registerProvider("nanogpt", {
-      name: "NanoGPT",
-      baseUrl: "https://nano-gpt.com/api/v1",
-      apiKey: "NANOGPT_API_KEY",
-      authHeader: true,
-      api: "openai-completions",
-      models: [],
-    });
-
-    pi.registerCommand("nanogpt-reload", {
-      description: "Ricarica i modelli NanoGPT dopo il login",
-      handler: async (_args, ctx) => {
-        ctx.ui.notify("Ricarico i modelli NanoGPT...", "info");
-        await ctx.reload();
-      },
-    });
-
-    return;
-  }
-
   let models: any[] = [];
-  try {
-    models = await fetchModels(apiKey);
-    console.log(`[nanogpt] caricati ${models.length} modelli`);
-  } catch (e) {
-    console.error("[nanogpt] fetch modelli fallito:", e);
+  if (apiKey) {
+    try {
+      models = await fetchModels(apiKey);
+      console.log(`[nanogpt] caricati ${models.length} modelli`);
+    } catch (e) {
+      console.error("[nanogpt] fetch modelli fallito:", e);
+    }
   }
 
   pi.registerProvider("nanogpt", {
@@ -69,5 +53,32 @@ export default async function (pi: ExtensionAPI) {
     authHeader: true,
     api: "openai-completions",
     models,
+    oauth: {
+      name: "NanoGPT (API Key)",
+      async login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials> {
+        const key = await callbacks.onPrompt({
+          message: "Paste your NanoGPT API key (nano-gpt.com/api):",
+        });
+        return {
+          access: key.trim(),
+          refresh: "",
+          expires: Date.now() + 1000 * 60 * 60 * 24 * 365,
+        };
+      },
+      async refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials> {
+        return { ...credentials, expires: Date.now() + 1000 * 60 * 60 * 24 * 365 };
+      },
+      getApiKey(credentials: OAuthCredentials): string {
+        return credentials.access;
+      },
+    },
+  });
+
+  pi.registerCommand("nanogpt-reload", {
+    description: "Reload NanoGPT models after login",
+    handler: async (_args, ctx) => {
+      ctx.ui.notify("Reloading NanoGPT models...", "info");
+      await ctx.reload();
+    },
   });
 }
