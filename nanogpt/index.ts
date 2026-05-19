@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
+//import type { OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -46,39 +46,34 @@ export default async function (pi: ExtensionAPI) {
     }
   }
 
+  if (!apiKey) {
   pi.registerProvider("nanogpt", {
     name: "NanoGPT",
     baseUrl: "https://nano-gpt.com/api/v1",
     apiKey: "NANOGPT_API_KEY",
     authHeader: true,
     api: "openai-completions",
-    models,
-    oauth: {
-      name: "NanoGPT (API Key)",
-      async login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials> {
-        const key = await callbacks.onPrompt({
-          message: "Paste your NanoGPT API key (nano-gpt.com/api):",
-        });
-        return {
-          access: key.trim(),
-          refresh: "",
-          expires: Date.now() + 1000 * 60 * 60 * 24 * 365,
-        };
+    models: [                              // <- sostituisci models: []
+      {
+        id: "nanogpt/setup-required",
+        name: "⚠ Run /login nanogpt to configure",
+        reasoning: false,
+        input: ["text"] as ("text" | "image")[],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1,
+        maxTokens: 1,
       },
-      async refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials> {
-        return { ...credentials, expires: Date.now() + 1000 * 60 * 60 * 24 * 365 };
-      },
-      getApiKey(credentials: OAuthCredentials): string {
-        return credentials.access;
-      },
-    },
+    ],
   });
 
   pi.registerCommand("nanogpt-reload", {
-    description: "Reload NanoGPT models after login",
+    description: "Ricarica i modelli NanoGPT dopo il login",
     handler: async (_args, ctx) => {
-      ctx.ui.notify("Reloading NanoGPT models...", "info");
+      ctx.ui.notify("Ricarico i modelli NanoGPT...", "info");
       await ctx.reload();
     },
   });
+
+  return;
+}
 }
