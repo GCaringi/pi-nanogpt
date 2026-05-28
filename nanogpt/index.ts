@@ -33,29 +33,57 @@ const fallbackModels = [
 ];
 
 export default async function (pi: ExtensionAPI) {
-  let apiKey = process.env.NANOGPT_API_KEY ?? "";
-  try {
-    const authPath = join(homedir(), ".pi", "agent", "auth.json");
-    const auth = JSON.parse(readFileSync(authPath, "utf-8"));
-    if (auth?.nanogpt?.access) apiKey = auth.nanogpt.access;
-  } catch {}
+  const providerId = "nanogpt";
 
-  let models = fallbackModels;
-  if (apiKey) {
-    try {
-      models = await fetchModels(apiKey);
-      console.log(`[nanogpt] caricati ${models.length} modelli`);
-    } catch (e) {
-      console.error("[nanogpt] fetch modelli fallito, uso fallback:", e);
+  async function registerWithModels(apiKey?: string) {
+    let models = fallbackModels;
+    if (apiKey) {
+      try {
+        models = await fetchModels(apiKey);
+        console.log(`[nanogpt] caricati ${models.length} modelli`);
+      } catch (e) {
+        console.error("[nanogpt] fetch modelli fallito, uso fallback:", e);
+      }
     }
+
+    pi.registerProvider(providerId, {
+      name: "NanoGPT",
+      baseUrl: "https://nano-gpt.com/api/v1",
+      apiKey: "NANOGPT_API_KEY",
+      authHeader: true,
+      api: "openai-completions",
+      models,
+      oauth: {
+        name: "NanoGPT",
+        async login(callbacks) {
+          const apiKey = await callbacks.onPrompt({
+            message: "Inserisci la tua API Key di NanoGPT:",
+            placeholder: "sk-...",
+          });
+          if (!apiKey) throw new Error("API Key richiesta");
+          await registerWithModels(apiKey);
+          return { access: apiKey, refresh: "", expires: Date.now() + 1000 * 60 * 60 * 24 * 365 };
+        },
+        getApiKey(creds) {
+          return (creds as any).access;
+        },
+        async refreshToken(creds) {
+          return creds;
+        },
+      },
+    });
   }
 
-  pi.registerProvider("nanogpt", {
-    name: "NanoGPT",
-    baseUrl: "https://nano-gpt.com/api/v1",
-    apiKey: "NANOGPT_API_KEY",
-    authHeader: true,
-    api: "openai-completions",
-    models,
-  });
+  // Caricamento iniziale se esiste già una chiave
+  let apiKey = process.env.NANOGPT_API_KEY;
+  if (!apiKey) {
+    try {
+      const authPath = join(homedir(), ".pi", "agent", "auth.json");
+      const auth = JSON.parse(readFileSync(authPath, "utf-8"));
+      if (auth?.[providerId]?.access) apiKey = auth[providerId].access;
+      else if (auth?.[providerId]?.type === "api_key") apiKey = auth[providerId].key;
+    } catch {}
+  }
+
+  await registerWithModels(apiKey);
 }
