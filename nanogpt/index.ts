@@ -40,9 +40,9 @@ export default async function (pi: ExtensionAPI) {
     if (apiKey) {
       try {
         models = await fetchModels(apiKey);
-        console.log(`[nanogpt] caricati ${models.length} modelli`);
+        console.log(`[nanogpt] loaded ${models.length} models`);
       } catch (e) {
-        console.error("[nanogpt] fetch modelli fallito, uso fallback:", e);
+        console.error("[nanogpt] fetch models failed, using fallback:", e);
       }
     }
 
@@ -57,10 +57,10 @@ export default async function (pi: ExtensionAPI) {
         name: "NanoGPT",
         async login(callbacks) {
           const apiKey = await callbacks.onPrompt({
-            message: "Inserisci la tua API Key di NanoGPT:",
+            message: "Enter your NanoGPT API Key:",
             placeholder: "sk-...",
           });
-          if (!apiKey) throw new Error("API Key richiesta");
+          if (!apiKey) throw new Error("API Key required");
           await registerWithModels(apiKey);
           return { access: apiKey, refresh: "", expires: Date.now() + 1000 * 60 * 60 * 24 * 365 };
         },
@@ -74,7 +74,7 @@ export default async function (pi: ExtensionAPI) {
     });
   }
 
-  // Caricamento iniziale se esiste già una chiave
+  // Initial loading if a key already exists
   let apiKey = process.env.NANOGPT_API_KEY;
   if (!apiKey) {
     try {
