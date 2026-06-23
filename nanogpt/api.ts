@@ -1,9 +1,12 @@
-export async function fetchModels(apiKey: string) {
-  const res = await fetch("https://nano-gpt.com/api/v1/models?detailed=true", {
+async function fetchJson(url: string, apiKey: string) {
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   const data = await res.json() as any;
-  const list = Array.isArray(data) ? data : (data?.data ?? []);
+  return Array.isArray(data) ? data : (data?.data ?? []);
+}
+
+function mapModels(list: any[]) {
   return list.map((m: any) => ({
     id: m.id,
     name: m.id,
@@ -13,6 +16,35 @@ export async function fetchModels(apiKey: string) {
     contextWindow: m.context_length ?? 128000,
     maxTokens: m.max_output_tokens ?? 4096,
   }));
+}
+
+export async function fetchSubscriptionModels(apiKey: string, baseUrl: string = process.env.OPENAI_BASE_URL || "https://nano-gpt.com/api/v1") {
+  if (baseUrl === "https://nano-gpt.com/api/v1") {
+    const models = await fetchJson("https://nano-gpt.com/api/subscription/v1/models?detailed=true", apiKey);
+    return mapModels(models);
+  } else {
+    // Custom proxy: usually there's no subscription models endpoint separate from main models
+    return [];
+  }
+}
+
+export async function fetchModels(apiKey: string, baseUrl: string = process.env.OPENAI_BASE_URL || "https://nano-gpt.com/api/v1") {
+  if (baseUrl === "https://nano-gpt.com/api/v1") {
+    const defaultBase = "https://nano-gpt.com";
+    const [allModels, subModels] = await Promise.all([
+      fetchJson(`${defaultBase}/api/v1/models?detailed=true`, apiKey),
+      fetchJson(`${defaultBase}/api/subscription/v1/models?detailed=true`, apiKey),
+    ]);
+
+    const subIds = new Set(subModels.map((m: any) => m.id));
+    const paidOnly = allModels.filter((m: any) => !subIds.has(m.id));
+
+    return mapModels(paidOnly);
+  } else {
+    // Custom proxy (Headroom, LiteLLM, etc.)
+    const models = await fetchJson(`${baseUrl}/models?detailed=true`, apiKey);
+    return mapModels(models);
+  }
 }
 
 export const fallbackModels = [

@@ -1,4 +1,4 @@
-import { fetchModels } from "./api";
+import { fetchModels, fetchSubscriptionModels } from "./api";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -30,6 +30,16 @@ async function getApiKey(): Promise<string | undefined> {
   return undefined;
 }
 
+function printSample(label: string, models: any[]) {
+  const slice = models.slice(0, 10);
+  let json = JSON.stringify(slice, null, 2);
+  if (json.length > 5000) {
+    json = json.slice(0, 5000) + "\n... [TRUNCATED]";
+  }
+  console.log(`\n[debug] === ${label} (${models.length} totali, mostrati i primi ${slice.length}) ===`);
+  console.log(json);
+}
+
 async function main() {
   const apiKey = await getApiKey();
   if (!apiKey) {
@@ -42,14 +52,17 @@ async function main() {
   }
 
   console.log("[debug] Lunghezza API Key:", apiKey.length);
-  console.log("[debug] Chiamata https://nano-gpt.com/api/v1/models ...");
 
   try {
-    const models = await fetchModels(apiKey);
-    console.log("[debug] SUCCESSO! Modelli ricevuti:", models.length);
-    // console.log(JSON.stringify(models, null, 2));
+    console.log("[debug] Chiamata /api/v1/models e /api/subscription/v1/models ...");
+    const paidModels = await fetchModels(apiKey);
+    printSample("PAID MODELS (assenti nella subscription)", paidModels);
+
+    console.log("[debug] Chiamata /api/subscription/v1/models ...");
+    const subModels = await fetchSubscriptionModels(apiKey);
+    printSample("SUBSCRIPTION MODELS", subModels);
   } catch (e: any) {
-    console.error("[debug] ERRORE durante fetchModels:", e.message);
+    console.error("[debug] ERRORE:", e.message);
     if (e.cause) console.error("[debug] Cause:", e.cause);
     console.error(e.stack);
     process.exit(1);

@@ -8,10 +8,12 @@ export default async function (pi: ExtensionAPI) {
   const providerId = "nanogpt";
 
   async function registerWithModels(apiKey?: string) {
+    const baseUrl = process.env.OPENAI_BASE_URL || "https://nano-gpt.com/api/v1";
+
     let models = fallbackModels;
     if (apiKey) {
       try {
-        models = await fetchModels(apiKey);
+        models = await fetchModels(apiKey, baseUrl);
         console.log(`[nanogpt] loaded ${models.length} models`);
       } catch (e) {
         console.error("[nanogpt] fetch models failed, using fallback:", e);
@@ -20,7 +22,7 @@ export default async function (pi: ExtensionAPI) {
 
     pi.registerProvider(providerId, {
       name: "NanoGPT",
-      baseUrl: "https://nano-gpt.com/api/v1",
+      baseUrl,
       apiKey: "$NANOGPT_API_KEY",
       authHeader: true,
       api: "openai-completions",
