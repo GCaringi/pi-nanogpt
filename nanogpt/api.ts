@@ -36,10 +36,15 @@ export async function fetchModels(apiKey: string, baseUrl: string = process.env.
       fetchJson(`${defaultBase}/api/subscription/v1/models?detailed=true`, apiKey),
     ]);
 
-    const subIds = new Set(subModels.map((m: any) => m.id));
-    const paidOnly = allModels.filter((m: any) => !subIds.has(m.id));
+    const merged = [...allModels];
+    const allIds = new Set(allModels.map((m: any) => m.id));
+    for (const m of subModels) {
+      if (!allIds.has(m.id)) {
+        merged.push(m);
+      }
+    }
 
-    return mapModels(paidOnly);
+    return mapModels(merged);
   } else {
     // Custom proxy (Headroom, LiteLLM, etc.)
     const models = await fetchJson(`${baseUrl}/models?detailed=true`, apiKey);
